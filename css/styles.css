@@ -12,6 +12,13 @@ html[data-theme="light"]{
   --text:#131a2e; --muted:#5b6788; --line:#dde3f5;
   --accent:#4a5cf0; --accent2:#0e9f9c; --shadow:0 8px 24px rgba(30,40,80,.12);
 }
+/* The `hidden` attribute must beat any author display rule.
+   Without this, `.overlay{display:flex}` and `.tts-hud{display:flex}` win over the
+   UA stylesheet's `[hidden]{display:none}` (author styles always beat UA styles),
+   so all four full-screen overlays and the TTS bar render on top of the page on
+   load, covering the content entirely. This is the fix for that. */
+[hidden]{display:none !important}
+
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{

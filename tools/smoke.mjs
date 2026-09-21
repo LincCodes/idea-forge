@@ -74,6 +74,30 @@ for (const m of html.matchAll(/(?:src|href)="((?!http|data:|#)[^"]+)"/g)) {
   try { readFileSync(p); } catch { console.error(`  ✗ index.html references missing file: ${m[1]}`); fail++; }
 }
 
+/* ------------------------------------------------- 2b. hidden-attribute guard */
+/* Author CSS beats the UA stylesheet, so `.overlay{display:flex}` silently wins
+   over `[hidden]{display:none}` and leaves every overlay covering the page.
+   That shipped once. A global [hidden] rule with !important is the only safe fix. */
+const css = readFileSync(join(root, 'css/styles.css'), 'utf8');
+const hiddenEls = [...html.matchAll(/<[^>]*\shidden(?=[\s>])[^>]*>/g)];
+console.log(`\nHidden-attribute guard — ${hiddenEls.length} elements carry [hidden]`);
+ok(hiddenEls.length > 0, 'expected some elements to use the hidden attribute');
+ok(/\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important/.test(css),
+  'css/styles.css needs a global `[hidden]{display:none !important}` rule, ' +
+  'otherwise any class with a display property will render despite [hidden]');
+/* any class on a [hidden] element that also sets display is the dangerous case */
+for (const m of hiddenEls) {
+  const tag = m[0];
+  const cls = (tag.match(/class="([^"]+)"/) || [, ''])[1].split(/\s+/).filter(Boolean);
+  for (const c of cls) {
+    const rule = new RegExp(`\\.${c}\\s*\\{[^}]*display\\s*:`, 'g');
+    if (rule.test(css)) {
+      ok(/\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important/.test(css),
+        `.${c} sets display and is used with [hidden] — needs the global !important rule`);
+    }
+  }
+}
+
 /* --------------------------------------------------------- 3. JS syntax */
 import { execSync } from 'node:child_process';
 for (const f of ['js/app.js', 'js/expand.js', 'sw.js']) {
