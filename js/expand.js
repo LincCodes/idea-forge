@@ -460,11 +460,19 @@
     };
 
     it.tldr = it.hook;
-    it.searchText = [it.id, it.title, it.category, it.stack, it.controls, it.art, it.hook, it.loop,
-      it.twist, it.levels, it.spark, it.tags.join(' '), it.whyAddictive, it.infiniteDesign,
-      it.depth, it.artDirection].join(' ').toLowerCase();
+    /* Search index covers the authored fields only. Including the generated prose
+       tripled this string for no real search benefit, since that prose is generic. */
+    it.searchText = [it.id, it.title, it.category, it.stack, it.controls, it.art, it.hook,
+      it.loop, it.twist, it.levels, it.spark, it.tags.join(' ')].join(' ').toLowerCase();
 
-    it.plain = buildPlain(it);
+    /* The full plain-text dump is ~3.5KB per idea. Building it for all 1500 up
+       front costs several megabytes of strings and noticeable GC churn, so it is
+       built on first access. Non-enumerable so JSON.stringify does not drag it in. */
+    let plainCache = null;
+    Object.defineProperty(it, 'plain', {
+      enumerable: false,
+      get() { return plainCache === null ? (plainCache = buildPlain(it)) : plainCache; }
+    });
     return it;
   }
 

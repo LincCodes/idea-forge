@@ -23,13 +23,36 @@
   };
 
   /* -------------------------------------------------------------- load data */
+  /* games.js is loaded statically in index.html so the first tab can paint
+     immediately. apps.js and websites.js (~400KB together) are fetched and
+     expanded afterwards, off the critical path. */
   const RAW = window.RAW || {};
-  const DATA = {
-    games: IdeaForge.build(RAW.games, 'games'),
-    apps: IdeaForge.build(RAW.apps, 'apps'),
-    websites: IdeaForge.build(RAW.websites, 'websites')
-  };
-  const ALL = [...DATA.games, ...DATA.apps, ...DATA.websites];
+  const DATA = { games: [], apps: [], websites: [] };
+  let ALL = [];
+
+  function isLoaded(kind) { return !!RAW[kind]; }
+
+  function ingest(kind) {
+    DATA[kind] = IdeaForge.build(RAW[kind], kind);
+    ALL = [...DATA.games, ...DATA.apps, ...DATA.websites];
+    DATA[kind].forEach((it, i) => it.index = i);
+    return DATA[kind].length;
+  }
+
+  function loadKind(kind) {
+    if (isLoaded(kind)) return Promise.resolve(ingest(kind));
+    return new Promise(resolve => {
+      const s = document.createElement('script');
+      s.src = 'data/' + kind + '.js';
+      s.async = true;
+      s.onload = () => resolve(ingest(kind));
+      s.onerror = () => { console.warn('Could not load', kind); resolve(0); };
+      document.head.appendChild(s);
+    });
+  }
+
+  const KIND_OF_TAB = { games: 'games', apps: 'apps', websites: 'websites' };
+  const LABEL_PLURAL = { games: 'games', apps: 'apps', websites: 'websites' };
 
   /* ------------------------------------------------------------------ utils */
   const $ = sel => document.querySelector(sel);
@@ -114,6 +137,8 @@
   }
 
   /* --------------------------------------------------------------- filters UI */
+  /* Idempotent: re-run after each data file arrives, so categories and tags from
+     apps/websites appear as soon as they load. Selections are preserved. */
   function buildFilterOptions() {
     const pool = ALL;
     const cats = [...new Set(pool.map(i => i.category))].sort();
@@ -122,22 +147,31 @@
     pool.forEach(i => i.tags.forEach(t => tags[t] = (tags[t] || 0) + 1));
     const topTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 60);
 
-    const fc = $('#filterCategory');
-    cats.forEach(c => fc.insertAdjacentHTML('beforeend', `<option value="${esc(c)}">${esc(c)}</option>`));
-    const fs = $('#filterStack');
-    stacks.forEach(c => fs.insertAdjacentHTML('beforeend', `<option value="${esc(c)}">${esc(c)}</option>`));
-
+    $('#filterCategory').innerHTML = '<option value="">All categories</option>' +
+      cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    $('#filterStack').innerHTML = '<option value="">All stacks</option>' +
+      stacks.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     $('#tagbar').innerHTML = topTags.map(([t, n]) =>
       `<button class="tag-chip" data-tag="${esc(t)}">${esc(t)} <span class="muted">${n}</span></button>`).join('');
+
+    if (cats.includes(state.category)) $('#filterCategory').value = state.category;
+    if (stacks.includes(state.stack)) $('#filterStack').value = state.stack;
+    [...state.tags].forEach(t => {
+      const c = document.querySelector(`.tag-chip[data-tag="${CSS.escape(t)}"]`);
+      if (c) c.classList.add('is-on');
+    });
   }
 
   /* ------------------------------------------------------------------ render */
   function renderCounts() {
-    $('#tabCountGames').textContent = DATA.games.length;
-    $('#tabCountApps').textContent = DATA.apps.length;
-    $('#tabCountWebsites').textContent = DATA.websites.length;
-    $('#tabCountAll').textContent = ALL.length;
-    $('#brandSub').textContent = ALL.length + ' buildable ideas';
+    const n = k => isLoaded(k) ? DATA[k].length.toLocaleString() : '…';
+    $('#tabCountGames').textContent = n('games');
+    $('#tabCountApps').textContent = n('apps');
+    $('#tabCountWebsites').textContent = n('websites');
+    $('#tabCountAll').textContent = ALL.length ? ALL.length.toLocaleString() : '…';
+    $('#brandSub').textContent = ALL.length === 1500
+      ? '1500 buildable ideas'
+      : ALL.length + ' of 1500 loaded…';
   }
 
   function cardHTML(it, q) {
@@ -164,6 +198,17 @@
 
   function render(reset) {
     const grid = $('#results');
+    const kind = KIND_OF_TAB[state.tab];
+    if (kind && !isLoaded(kind)) {
+      $('#boot').hidden = false;
+      $('#bootMsg').textContent = 'Loading ' + LABEL_PLURAL[kind] + '…';
+      grid.innerHTML = '';
+      $('#resultCount').textContent = 'Loading…';
+      $('#empty').hidden = true;
+      return;
+    }
+    $('#boot').hidden = true;
+
     const q = state.q.trim();
     if (reset) grid.innerHTML = '';
     const slice = state.results.slice(reset ? 0 : grid.children.length, state.shown);
@@ -189,9 +234,15 @@
 
   /* ------------------------------------------------------------------ panel */
   let openItem = null;
+  let pendingDetail = null;
   function openDetail(id, push) {
     const it = ALL.find(x => x.id === id);
-    if (!it) return;
+    if (!it) {
+      /* a deep link can arrive before its data file has been fetched */
+      if (DATA.games.length && DATA.apps.length && DATA.websites.length) toast('Idea not found');
+      else pendingDetail = { id, push };
+      return;
+    }
     openItem = it;
     $('#panelCat').textContent = (KIND_LABEL[it.kind] || it.kind) + ' · ' + it.category + ' · ' + it.stack;
     $('#panelTitle').textContent = it.title;
@@ -622,26 +673,39 @@
   }
 
   /* ------------------------------------------------------------------- boot */
+  function afterLoad(kind) {
+    buildFilterOptions();
+    renderCounts();
+    if (pendingDetail) { const p = pendingDetail; pendingDetail = null; openDetail(p.id, p.push); }
+    if (state.tab === kind || state.tab === 'all') refresh();
+  }
+
   function boot() {
     const theme = localStorage.getItem('if.theme');
     if (theme) document.documentElement.dataset.theme = theme;
+
+    /* first paint: games only, which is all that is in the critical path */
+    ingest('games');
     buildFilterOptions();
     readHash();
     syncTabs();
     $('#sort').value = state.sort;
-    $('#filterCategory').value = state.category;
-    $('#filterStack').value = state.stack;
-    [...state.tags].forEach(t => {
-      const c = document.querySelector(`.tag-chip[data-tag="${CSS.escape(t)}"]`);
-      if (c) c.classList.add('is-on');
-    });
     wire();
     loadVoices();
     refresh();
+
+    /* the other two files (~400KB) load after first paint, then expand */
+    loadKind('apps').then(afterLoad.bind(null, 'apps'))
+      .then(() => loadKind('websites'))
+      .then(afterLoad.bind(null, 'websites'))
+      .catch(e => console.warn('Background load failed', e));
+
     window.addEventListener('hashchange', () => { if (location.hash.startsWith('#/')) readHash(); });
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('sw.js').catch(() => { });
-    }
+    window.addEventListener('load', () => {
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('sw.js').catch(() => { });
+      }
+    });
     console.log('%cIdea Forge ready', 'color:#3ddbd9',
       { games: DATA.games.length, apps: DATA.apps.length, websites: DATA.websites.length });
   }

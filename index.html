@@ -77,6 +77,11 @@
 </section>
 
 <main>
+  <div id="boot" class="boot" role="status" aria-live="polite">
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <p id="bootMsg">Loading 500 games…</p>
+    <p class="boot-sub">Apps and websites load in the background.</p>
+  </div>
   <div id="results" class="grid" tabindex="-1"></div>
   <div id="sentinel" class="sentinel" aria-hidden="true"></div>
   <div id="empty" class="empty" hidden>
@@ -187,8 +192,6 @@
 </div>
 
 <script src="data/games.js"></script>
-<script src="data/apps.js"></script>
-<script src="data/websites.js"></script>
 <script src="js/expand.js"></script>
 <script src="js/app.js"></script>
 </body>
