@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Idea Forge — 500 Games · 500 Apps · 500 Websites</title>
+<meta name="description" content="A searchable, listenable catalog of 1500 buildable product ideas: mobile-first games, apps and websites.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b1020">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<a class="skip" href="#results">Skip to results</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">IF</span>
+    <div class="brand-text">
+      <strong>Idea Forge</strong>
+      <small id="brandSub">1500 buildable ideas</small>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Catalog sections">
+    <button class="tab is-active" role="tab" aria-selected="true" data-tab="games">Games <span class="pill" id="tabCountGames">0</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="apps">Apps <span class="pill" id="tabCountApps">0</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="websites">Websites <span class="pill" id="tabCountWebsites">0</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="all">All <span class="pill" id="tabCountAll">0</span></button>
+  </nav>
+
+  <div class="top-actions">
+    <button class="icon-btn" id="btnRandom" title="Surprise me (R)" aria-label="Surprise me">🎲</button>
+    <button class="icon-btn" id="btnStats" title="Stats" aria-label="Stats">📊</button>
+    <button class="icon-btn" id="btnExport" title="Export" aria-label="Export">⤓</button>
+    <button class="icon-btn" id="btnTheme" title="Toggle theme (T)" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<section class="controls" aria-label="Search and filters">
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="search" type="search" placeholder="Search 1500 ideas — mechanic, vibe, stack, tag…  (press /)" autocomplete="off" spellcheck="false">
+      <button class="clear-btn" id="btnClearSearch" hidden aria-label="Clear search">✕</button>
+    </div>
+    <select id="sort" aria-label="Sort">
+      <option value="relevance">Best match</option>
+      <option value="az">A → Z</option>
+      <option value="za">Z → A</option>
+      <option value="stack">By stack</option>
+      <option value="category">By category</option>
+    </select>
+  </div>
+
+  <div class="filter-row">
+    <select id="filterCategory" aria-label="Filter by category"><option value="">All categories</option></select>
+    <select id="filterStack" aria-label="Filter by build stack"><option value="">All stacks</option></select>
+    <label class="toggle"><input type="checkbox" id="favOnly"> <span>★ Favourites</span></label>
+    <label class="toggle"><input type="checkbox" id="unbuiltOnly"> <span>◻ Not yet built</span></label>
+    <button class="ghost-btn" id="btnClearFilters">Reset</button>
+  </div>
+
+  <div class="tagbar" id="tagbar" aria-label="Tag filters"></div>
+
+  <div class="meta-row">
+    <span id="resultCount" class="result-count">Loading…</span>
+    <div class="tts-mini" role="group" aria-label="Read aloud controls">
+      <button class="mini" id="btnReadResults" title="Read visible results aloud">▶ Read list</button>
+      <button class="mini" id="btnPause" hidden>⏸ Pause</button>
+      <button class="mini" id="btnResume" hidden>⏵ Resume</button>
+      <button class="mini" id="btnStop" hidden>⏹ Stop</button>
+      <label class="rate">Speed <input type="range" id="rate" min="0.6" max="1.8" step="0.1" value="1"></label>
+      <select id="voice" aria-label="Voice"></select>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div id="results" class="grid" tabindex="-1"></div>
+  <div id="sentinel" class="sentinel" aria-hidden="true"></div>
+  <div id="empty" class="empty" hidden>
+    <p>No ideas match that.</p>
+    <button class="ghost-btn" id="btnEmptyReset">Reset filters</button>
+  </div>
+</main>
+
+<footer class="foot">
+  <p><strong>Concepts, not clearances.</strong> These are original starting points for prototyping — check prior art, trademarks and store policies before you ship. Uniqueness claims are differentiators, not legal guarantees.</p>
+  <p class="foot-links">
+    <button class="linkish" id="btnShortcuts">Keyboard shortcuts</button> ·
+    <button class="linkish" id="btnAbout">About this catalog</button>
+  </p>
+</footer>
+
+<!-- Detail panel -->
+<div class="overlay" id="overlay" hidden>
+  <aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <header class="panel-head">
+      <div>
+        <span class="badge" id="panelCat">—</span>
+        <h2 id="panelTitle">—</h2>
+        <p class="tagline" id="panelHook">—</p>
+      </div>
+      <div class="panel-head-actions">
+        <button class="icon-btn" id="btnFav" title="Favourite (F)" aria-label="Favourite">☆</button>
+        <button class="icon-btn" id="btnBuilt" title="Mark as built (B)" aria-label="Mark as built">◻</button>
+        <button class="icon-btn" id="btnShare" title="Copy link" aria-label="Copy link">🔗</button>
+        <button class="icon-btn" id="btnClose" title="Close (Esc)" aria-label="Close">✕</button>
+      </div>
+    </header>
+
+    <div class="panel-tts">
+      <button class="mini" id="btnReadItem">▶ Read this idea</button>
+      <button class="mini" id="btnCopyItem">⧉ Copy full details</button>
+      <button class="mini" id="btnCopyMd">⧉ Copy as Markdown</button>
+      <button class="mini" id="btnCopyJson">⧉ Copy as JSON</button>
+    </div>
+
+    <div class="panel-body" id="panelBody"></div>
+  </aside>
+</div>
+
+<!-- Stats modal -->
+<div class="overlay" id="statsOverlay" hidden>
+  <div class="panel narrow" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <header class="panel-head">
+      <h2 id="statsTitle">Catalog stats</h2>
+      <button class="icon-btn" id="btnStatsClose" aria-label="Close">✕</button>
+    </header>
+    <div class="panel-body" id="statsBody"></div>
+  </div>
+</div>
+
+<!-- Export modal -->
+<div class="overlay" id="exportOverlay" hidden>
+  <div class="panel narrow" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <header class="panel-head">
+      <h2 id="exportTitle">Export</h2>
+      <button class="icon-btn" id="btnExportClose" aria-label="Close">✕</button>
+    </header>
+    <div class="panel-body">
+      <p class="muted">Export the current result set, or everything.</p>
+      <div class="export-grid">
+        <button class="ghost-btn" data-export="json:current">JSON — current results</button>
+        <button class="ghost-btn" data-export="json:all">JSON — all 1500</button>
+        <button class="ghost-btn" data-export="csv:current">CSV — current results</button>
+        <button class="ghost-btn" data-export="md:current">Markdown — current results</button>
+        <button class="ghost-btn" data-export="txt:current">Plain text — current results</button>
+        <button class="ghost-btn" data-export="json:fav">JSON — favourites</button>
+        <button class="ghost-btn" data-export="md:fav">Markdown — favourites</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shortcuts modal -->
+<div class="overlay" id="helpOverlay" hidden>
+  <div class="panel narrow" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <header class="panel-head">
+      <h2 id="helpTitle">Keyboard shortcuts</h2>
+      <button class="icon-btn" id="btnHelpClose" aria-label="Close">✕</button>
+    </header>
+    <div class="panel-body">
+      <table class="keys">
+        <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close panel / clear search</td></tr>
+        <tr><td><kbd>J</kbd> <kbd>K</kbd></td><td>Next / previous idea</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Open focused card</td></tr>
+        <tr><td><kbd>S</kbd></td><td>Speak focused idea</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Copy focused idea</td></tr>
+        <tr><td><kbd>F</kbd></td><td>Favourite focused idea</td></tr>
+        <tr><td><kbd>B</kbd></td><td>Mark focused idea as built</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Random idea</td></tr>
+        <tr><td><kbd>T</kbd></td><td>Toggle theme</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Switch tab</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="ttsHud" class="tts-hud" hidden>
+  <span class="dot" aria-hidden="true"></span>
+  <span id="ttsLabel">Reading…</span>
+  <button class="mini" id="hudStop">Stop</button>
+</div>
+
+<script src="data/games.js"></script>
+<script src="data/apps.js"></script>
+<script src="data/websites.js"></script>
+<script src="js/expand.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
