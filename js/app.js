@@ -234,7 +234,7 @@
     document.body.style.overflow = '';
     openItem = null;
     tts.stop();
-    if (location.hash.startsWith('#/')) history.replaceState(null, '', location.pathname + location.search);
+    if (location.hash.startsWith('#/')) safeReplaceHash('');
   }
 
   /* -------------------------------------------------------------------- TTS */
@@ -394,6 +394,11 @@
   }
 
   /* ------------------------------------------------------------------- hash */
+  function safeReplaceHash(hash) {
+    try { history.replaceState(null, '', location.pathname + location.search + hash); }
+    catch (e) { /* file:// or sandboxed contexts can refuse this; not fatal */ }
+  }
+
   function syncHash() {
     if (location.hash.startsWith('#/')) return;
     const parts = ['tab=' + state.tab];
@@ -402,7 +407,7 @@
     if (state.stack) parts.push('s=' + encodeURIComponent(state.stack));
     if (state.tags.size) parts.push('t=' + encodeURIComponent([...state.tags].join(',')));
     if (state.sort !== 'relevance') parts.push('o=' + state.sort);
-    history.replaceState(null, '', '#' + parts.join('&'));
+    safeReplaceHash('#' + parts.join('&'));
   }
   function readHash() {
     const h = location.hash.slice(1);
