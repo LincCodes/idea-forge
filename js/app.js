@@ -686,8 +686,8 @@
 
     /* first paint: games only, which is all that is in the critical path */
     ingest('games');
+    readHash();          /* must run before buildFilterOptions so URL filters apply */
     buildFilterOptions();
-    readHash();
     syncTabs();
     $('#sort').value = state.sort;
     wire();
