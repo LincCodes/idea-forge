@@ -5,7 +5,7 @@ core loop, the twist, why it's addictive, level structure and how it stays endle
 art direction, first-60-seconds design, difficulty curve, long-term depth, a stack-specific
 prototype plan, retention hooks, monetisation, pitfalls and a prior-art note.
 
-**Live site:** open `index.html` locally, or the GitHub Pages URL once enabled.
+**Live site:** https://linccodes.github.io/idea-forge/
 
 ---
 
@@ -22,6 +22,7 @@ prototype plan, retention hooks, monetisation, pitfalls and a prior-art note.
 | `data/websites.js` | 500 website ideas |
 | `tools/validate.mjs` | Structural check across all 1500 entries |
 | `tools/normalise.mjs` | Idempotent normaliser for the compact authoring format |
+| `tools/smoke.mjs` | Expansion integrity + DOM wiring tests |
 | `sw.js`, `manifest.json` | Offline cache + installable PWA |
 
 ## Features

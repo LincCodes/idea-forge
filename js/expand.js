@@ -12,13 +12,40 @@
   'use strict';
 
   /* ---------------------------------------------------------------- helpers */
+  /* FNV-1a, then a murmur3-style avalanche. The avalanche matters: raw FNV-1a
+     low bits are poorly mixed, and `hash(x) % pool.length` for small pools then
+     collapses to a handful of values. */
   function hash(str) {
     let h = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    h ^= h >>> 16; h = Math.imul(h, 2246822507) >>> 0;
+    h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+    h ^= h >>> 16;
     return h >>> 0;
   }
   function pick(pool, seed) { return pool[hash(seed) % pool.length]; }
-  function parts(seed, pools) { return pools.map((p, i) => pick(p, seed + '#' + i)).join(' '); }
+  /* Compose one field from several pools. When the same pool is passed twice we
+     must not emit the same sentence twice, so a taken slot steps to the next
+     free entry (deterministically). */
+  function parts(seed, pools) {
+    const used = new Set();
+    return pools.map((p, i) => {
+      let idx = hash(seed + '#' + i) % p.length;
+      let guard = 0;
+      while (used.has(p[idx]) && guard++ < p.length) idx = (idx + 1) % p.length;
+      used.add(p[idx]);
+      return p[idx];
+    }).join(' ');
+  }
+  /* n distinct entries from one pool, chosen from independent hashes */
+  function sample(pool, seed, n) {
+    const out = [], used = new Set();
+    for (let i = 0; out.length < n && i < n * 12; i++) {
+      const idx = hash(seed + '@' + i) % pool.length;
+      if (!used.has(idx)) { used.add(idx); out.push(pool[idx]); }
+    }
+    return out;
+  }
   function uniq(arr) { return Array.from(new Set(arr.filter(Boolean))); }
 
   /* ------------------------------------------------------- category family */
@@ -144,6 +171,31 @@
       'Lighting is faked with two gradients and a vignette, which is 20 minutes of work and looks deliberate.',
       'Silhouette-first design: every object must be identifiable as a black shape before any colour is applied.'
     ],
+    /* art direction for apps and websites — interface and information design, not game visuals */
+    artApp: [
+      'A single strong accent colour on a neutral base, so the interface recedes and the data leads.',
+      'Generous whitespace and one clear primary action per screen.',
+      'System fonts only, which load instantly and look native everywhere.',
+      'Dense information design with a compact rhythm, for users who live in it all day.',
+      'A calm, low-contrast palette that is comfortable across long sessions.',
+      'Bold, high-contrast typography that reads at a glance on a phone in sunlight.',
+      'A restrained editorial look — rules, columns and typography instead of cards and shadows.',
+      'Soft, rounded, friendly shapes that reduce the intimidation of a data-heavy tool.',
+      'Dark-first, for evening and professional use.',
+      'Illustration used sparingly, only to explain an empty state or a concept.',
+      'Motion used only to show causality — what changed and why — never for decoration.',
+      'A deliberately unstyled look that signals "this is a tool, not a product".'
+    ],
+    artBApp: [
+      'Accessibility is the visual system: contrast, focus states and target sizes are decided first.',
+      'Every screen has one job, and the layout makes that job obvious within two seconds.',
+      'Visual hierarchy comes from size and weight, never from colour alone.',
+      'Empty states are designed as carefully as full ones, because they are where users decide to stay.',
+      'Loading and error states get the same care as the happy path.',
+      'The interface is designed against real content, never lorem ipsum, so it is tested against reality.',
+      'Colour carries meaning only, never decoration, so it stays informative.',
+      'The design system is small enough to hold in your head: three type sizes and two spacings.'
+    ],
     protoJs: [
       'Scaffold a single index.html with a full-bleed <canvas> and a 2D context; no framework, no build step.',
       'Keep all state in one plain object (entities, score, phase, seed) and write a pure update(dt) plus draw() pair.',
@@ -180,7 +232,93 @@
       'A weekly rotating modifier keeps the meta fresh for the cost of one parameter.',
       'Shareable result cards turn every good run into free acquisition.',
       'A small collection with visible empty slots creates a completion pull that is honest about the effort.',
-      'Comeback mechanics: after a break, the player is handed a generous run so returning feels good.'
+      'Comeback mechanics: after a break, the player is handed a generous run so returning feels good.',
+      'A visible history of your own best moments gives the game a personal archive worth returning to.',
+      'Optional challenges unlock only after you have mastered the base game, so there is always a harder version.',
+      'Seasonal events reuse the same mechanics with a new coat of paint, which is cheap to build and feels new.',
+      'A friend list that shows only what you can beat, never a global ranking, keeps comparison motivating.',
+      'Session summaries name the one thing you did better than last time, which is a reason to come back.',
+      'Unlockable modifiers let veterans replay old content in a way that feels new.'
+    ],
+    /* framing for apps and websites — usage and adoption, not levels and runs */
+    whyApp: [
+      'It removes a task the user already resents, which is the most reliable kind of value.',
+      'The tool gets better as it accumulates the user\'s own data, so the switching cost grows honestly.',
+      'It answers a question the user has asked repeatedly and never had a good way to answer.',
+      'The information it provides is not available anywhere else in a usable form.',
+      'It converts an anxious, unbounded problem into a bounded, visible one.',
+      'It works in the exact moment of need, which is when every other tool is too slow.',
+      'It does one thing completely rather than ten things partially.',
+      'The output is immediately shareable, which makes it useful to the user\'s whole group.',
+      'It replaces a spreadsheet that somebody was maintaining reluctantly.',
+      'It turns a recurring chore into a single decision.',
+      'It makes something visible that the user could previously only feel.',
+      'It reduces a decision to a comparison, which is the form decisions actually take.'
+    ],
+    whyBApp: [
+      'Trust is the product: it shows its sources, admits uncertainty and never overstates.',
+      'The user remains in control of their data, including the ability to leave with it.',
+      'It is an order of magnitude faster than the alternative, which is a feature in itself.',
+      'It is honest about what it cannot do, which makes the parts it can do believable.',
+      'Nothing important is hidden behind a paywall that would make the free version useless.',
+      'The tool is small enough to understand completely, which is increasingly rare.',
+      'It is accessible by default rather than as an afterthought.',
+      'It works offline, which is often exactly when people need it.'
+    ],
+    firstMinuteApp: [
+      'The first screen is the tool itself, already usable, with no signup wall and no product tour.',
+      'You complete one real task in the first minute, using your own data, before being asked for anything.',
+      'The value is demonstrated on an example that can be replaced with real data in one click.',
+      'A sample dataset is preloaded so the tool can be explored meaningfully before committing anything.',
+      'The first interaction produces a visible result immediately, which is what earns the second interaction.'
+    ],
+    sessionApp: [
+      'Typical use is a two-minute check, with occasional deep sessions of twenty minutes or more.',
+      'The tool is designed for the moment of need, which is usually short and specific.',
+      'Daily use is a glance, weekly use is a review, monthly use is a decision.',
+      'Sessions are short by design, because the tool should get out of the way.',
+      'Heavy users spend an hour at a time and light users spend thirty seconds. Both are first-class.',
+      'The interface is optimised for repeat visits with a known task, not for first-time exploration.',
+      'Usage clusters around external events — a deadline, a move, a diagnosis — so it must be ready instantly.'
+    ],
+    difficultyApp: [
+      'The learning curve is deliberately shallow: the first task completes in under a minute with no setup.',
+      'Complexity is progressively disclosed, so power features appear only when they become relevant.',
+      'An advanced layer exists for people who need it, but nothing forces anyone through it.',
+      'Onboarding is a single real task rather than a tour, so competence arrives immediately.',
+      'The interface rewards repeat use by moving frequent actions closer and hiding the rest.',
+      'The hard part is the user\'s actual problem, not the software, so the tool stays out of the way.'
+    ],
+    infiniteApp: [
+      'Scale comes from the data model rather than from content: every new user, place or record adds value without any authoring.',
+      'The product improves with use, so the thousandth session is more useful than the first.',
+      'Coverage expands by geography and category rather than by content, so there is always a new region to open.',
+      'The dataset grows from public sources, so the catalogue expands without anyone writing new entries.',
+      'Every user contribution is a new row, so the product is unlimited by construction.',
+      'Integrations are the growth path: each new service connected multiplies the use cases without new features.',
+      'It is a general engine applied to a niche, so the same core serves adjacent verticals indefinitely.',
+      'Templates plus user content mean the library grows faster than any team could author it.',
+      'Every completed use case produces a reusable artefact, so the library compounds.',
+      'Scale is bounded only by the number of real-world objects in the category, which is effectively unlimited.',
+      'Open data feeds mean the content refreshes itself continuously without editorial work.',
+      'Growth comes by vertical: the same core applied to a new industry is a new product with no new architecture.'
+    ],
+    /* retention for apps and websites — no streaks, no ghosts, no leaderboards */
+    retentionApp: [
+      'A weekly digest that summarises what changed for the user, not what changed in the product.',
+      'Data the user has already entered becomes more valuable over time, which is an honest switching cost.',
+      'A shareable artefact — a report, a card, a link — turns one user into several without growth hacking.',
+      'Reminders that arrive when action is actually possible, not when it is convenient for the app.',
+      'A history view that shows accumulated value, so quitting feels like losing something real.',
+      'An export that works perfectly, which paradoxically increases trust and therefore retention.',
+      'A small weekly ritual — one review, one decision — that fits an existing habit rather than competing with it.',
+      'Optional comparison against similar users, never a global leaderboard.',
+      'A "since you were last here" summary that respects gaps instead of guilt-tripping.',
+      'Progressive personalisation: the tool gets measurably better for this user the longer they use it.',
+      'Offline capability, so the tool works in the situations where it is actually needed.',
+      'One metric the user genuinely cares about, shown prominently and honestly, including when it gets worse.',
+      'A public changelog that shows the product is alive and responding to real requests.',
+      'A generous free tier that makes the tool easy to recommend, which is the only sustainable acquisition channel.'
     ],
     money: [
       'Free with a single one-time unlock that removes ads and adds cosmetic slots — the least resented model in mobile.',
@@ -191,6 +329,21 @@
       'Sponsor a daily challenge with a themed cosmetic set; the sponsor gets a moment, the player gets a skin.',
       'No monetisation at all: ship it as a portfolio piece and use it to sell contract work.'
     ],
+    /* monetisation for apps and websites */
+    moneyApp: [
+      'Free for the core use case, with a paid tier for teams and shared workspaces.',
+      'A one-time purchase, priced low enough to be an easy decision and high enough to fund maintenance.',
+      'Free with an optional annual subscription that funds ongoing data maintenance.',
+      'Free for individuals, paid for organisations, with no feature gating for personal use.',
+      'A percentage fee on transactions only, so the tool is free until it makes the user money.',
+      'No monetisation: build it as a public good and fund it through grants or donations.',
+      'Free, with a paid API for developers who want to build on the data.',
+      'Freemium limited by volume rather than by features, so the free tier is genuinely usable.',
+      'A marketplace take rate, kept low and published openly.',
+      'Free, with a paid setup and support service for organisations that need hand-holding.',
+      'A "pay what it is worth" model with a suggested price and no enforcement.',
+      'Free forever for the parts that require no ongoing cost, paid only where storage or compute is real.'
+    ],
     pitfalls: [
       'Do not add a currency the player can only earn by grinding — it hides the fun behind arithmetic.',
       'Avoid a tutorial longer than the first level; teach through level one instead.',
@@ -200,7 +353,30 @@
       'Avoid art that fights readability on a 5-inch screen at arm\'s length in daylight.',
       'Do not build servers for a single-player loop; a seed string is a free backend.',
       'Beware scope creep in the meta layer — one unlock axis is plenty for v1.',
-      'Do not hide the score; the number is the motivation.'
+      'Do not hide the score; the number is the motivation.',
+      'Do not gate the fun behind a timer or an energy system — it converts play into waiting.',
+      'Avoid a settings screen before the first play; every option is a decision the player did not ask for.',
+      'Do not punish failure with lost account progress; the loss should be the run, not the save file.',
+      'Beware a second currency — it doubles the mental bookkeeping for no new decisions.',
+      'Do not rely on notifications to bring people back; the game should be worth opening on its own.',
+      'Avoid a mandatory tutorial on repeat installs; let returning players skip it.'
+    ],
+    /* pitfalls for apps and websites */
+    pitfallsApp: [
+      'Do not require an account before the tool does anything useful.',
+      'Avoid a paywall that blocks the moment of first value.',
+      'Do not ask for permissions before explaining why they are needed.',
+      'Avoid a notification strategy that trains users to ignore notifications.',
+      'Do not make the free tier deliberately frustrating — it converts users into critics.',
+      'Beware building a social layer before the single-player value exists.',
+      'Do not sync to the cloud by default; ask, and explain what leaves the device.',
+      'Avoid hiding the important toggle three levels deep in a settings screen.',
+      'Do not collect data you cannot justify in one sentence.',
+      'Avoid a redesign that moves the buttons people have already learned.',
+      'Do not gate exports behind a subscription; it reads as hostage-taking.',
+      'Beware onboarding tours; the interface should explain itself.',
+      'Do not ship a mobile experience that is a squeezed desktop layout.',
+      'Avoid vanity metrics on the dashboard; show the one number that changes a decision.'
     ],
     prior: [
       'Adjacent to existing titles in this genre, but the twist above is the differentiator — verify the specific mechanic before committing.',
@@ -252,18 +428,31 @@
     const fam = familyOf(category + ' ' + tags.join(' '));
     const s = id + '|' + title;
 
+    const isGame = kind === 'games';
+    /* apps and websites get usage-shaped framing; games get run-and-level framing */
+    const Q = {
+      why: isGame ? [P.why, P.whyB] : [P.whyApp, P.whyBApp],
+      first: isGame ? [P.firstMinute, P.whyB] : [P.firstMinuteApp, P.whyBApp],
+      sess: isGame ? [P.session, P.difficulty] : [P.sessionApp, P.difficultyApp],
+      inf: isGame ? [P.infinite, P.infinite] : [P.infiniteApp, P.infiniteApp],
+      artB: isGame ? P.artB : P.artBApp,
+      art: isGame ? P.art : P.artApp,
+      ret: isGame ? P.retention : P.retentionApp,
+      pit: isGame ? P.pitfalls : P.pitfallsApp,
+      mon: isGame ? P.money : P.moneyApp
+    };
     const it = {
       id, kind, title, category, stack, controls, art, hook, loop, twist, levels, spark, tags,
       index,
-      whyAddictive: [spark, parts(s + 'why', [P.why, P.whyB])].join(' '),
-      firstMinute: parts(s + 'first', [P.firstMinute, P.whyB]),
-      sessionShape: parts(s + 'sess', [P.session, P.difficulty]),
-      infiniteDesign: levels + ' ' + parts(s + 'inf', [P.infinite, P.infinite]),
+      whyAddictive: [spark, parts(s + 'why', Q.why)].join(' '),
+      firstMinute: parts(s + 'first', Q.first),
+      sessionShape: parts(s + 'sess', Q.sess),
+      infiniteDesign: levels + ' ' + parts(s + 'inf', Q.inf),
       depth: (P.depthFamily[fam] || P.depthFamily.general) + ' ' + parts(s + 'depth', [P.depth, P.depth]),
-      artDirection: (P.artB[hash(s + 'artb') % P.artB.length]) + ' ' + parts(s + 'art', [P.art, P.art]),
-      retention: uniq([parts(s + 'ret', [P.retention, P.retention])]),
-      monetisation: parts(s + 'mon', [P.money, P.money]),
-      pitfalls: uniq([parts(s + 'pit', [P.pitfalls, P.pitfalls])]),
+      artDirection: Q.artB[hash(s + 'artb') % Q.artB.length] + ' ' + parts(s + 'art', [Q.art, Q.art]),
+      retention: sample(Q.ret, s + 'ret', 3),
+      monetisation: parts(s + 'mon', [Q.mon, Q.mon]),
+      pitfalls: sample(Q.pit, s + 'pit', 3),
       priorArt: pick(P.prior, s + 'prior'),
       controlsDetail: P.controlsPool[controls] || P.controlsPool.tap,
       prototype: (stack === 'godot' ? P.protoGodot : stack === 'flutter' ? P.protoFlutter : P.protoJs)
